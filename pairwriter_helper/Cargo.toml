@@ -1,0 +1,13 @@
+[package]
+name = "pairwriter_helper"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+lazy_static = "1.5.0"
+pairwriter= { git = "https://github.com/m10090/PairWriter" }
+mlua = { version = "0.9.9", features = ["lua51", "module", "async"] }
+tokio = "1.40.0"
