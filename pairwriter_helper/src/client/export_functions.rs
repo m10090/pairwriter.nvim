@@ -49,6 +49,7 @@ pub(super) fn export_cmds(lua: &Lua) -> LuaResult<()> {
         ("PairwriterCreateFile", create_file, auto_complete_file),
         +
         ("PairwriterSaveFile", save_file),
+        ("PairwriterShowPrevildege", show_previledge),
     );
 
     Ok(())
@@ -110,7 +111,8 @@ fn save_file(lua: &Lua, _: ()) -> LuaResult<()> {
     });
     Ok(())
 }
-fn create_file(_lua: &Lua, path: String) -> LuaResult<()> {
+fn create_file(_lua: &Lua, input: LuaTable) -> LuaResult<()> {
+    let path = input.get::<_, String>("args")?.trim_end().to_string();
     std::thread::spawn(|| {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
@@ -126,7 +128,8 @@ fn create_file(_lua: &Lua, path: String) -> LuaResult<()> {
 
     Ok(())
 }
-fn remove_file(lua: &Lua, path: String) -> LuaResult<()> {
+fn remove_file(lua: &Lua, path: LuaTable) -> LuaResult<()> {
+    let path: String = path.get::<_,String>("args")?.trim_end().to_string();
     // remove file from the filesystem
     lua.load(format!(
         r#"
@@ -156,7 +159,7 @@ fn remove_file(lua: &Lua, path: String) -> LuaResult<()> {
 }
 
 fn open_file(lua: &Lua, input: LuaTable) -> LuaResult<()> {
-    let relative_path: String = input.get("args")?;
+    let relative_path: String = input.get::<_,String>("args")?.trim_end().to_string();
     let res = RT
         .block_on(async {
             let mut api = client_api.get().unwrap().lock().await;
@@ -247,7 +250,21 @@ fn create_dir(_lua: &Lua, input: LuaTable) -> LuaResult<()> {
         Ok(())
     })
 }
+fn show_previledge(lua: &Lua,_:()) -> LuaResult<()> {
+    let k  = RT.block_on(async {
+            match client_api.get().unwrap().lock().await.priviledge{
+                Priviledge::ReadWrite => {
+                    "write"
+                }
+                Priviledge::ReadOnly => {
+                    "read"
+                }
+            }
+        });
+    lua.globals().call_function("print",k)?;
+    Ok(())
 
+}
 fn auto_complete_dir(_lua: &Lua, _arg_lead: String) -> LuaResult<Vec<String>> {
     // todo
     Ok(vec![])

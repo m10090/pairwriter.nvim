@@ -38,23 +38,23 @@ pub(super) fn export_cmds(lua: &Lua) -> LuaResult<()> {
     }
     commands!(
         lua,
-        ("PairwriterRemoveFile", remove_file, auto_complete_file)
-        ("PairwriterMoveFile", move_file, auto_complete_file)
-        ("PairwriterCreateDir", create_dir, auto_complete_dir)
-        ("PairwriterRemoveDir", remove_dir, auto_complete_dir)
-        ("PairwriterMoveDir", move_dir, auto_complete_dir)
-        (
+        ("PairwriterRemoveFile", remove_file, auto_complete_file)(
+            "PairwriterMoveFile",
+            move_file,
+            auto_complete_file
+        )("PairwriterCreateDir", create_dir, auto_complete_dir)(
+            "PairwriterRemoveDir",
+            remove_dir,
+            auto_complete_dir
+        )("PairwriterMoveDir", move_dir, auto_complete_dir)(
             "PairwriterDisconnectUser",
             disconnect_user,
             auto_complete_users
-        )
-        (
+        )(
             "PairwriterChangePreviledge",
             change_prevlidge,
             auto_complete_users
-        )
-        +
-        ("PairwriterListUsers", list_users)
+        ) + ("PairwriterListUsers", list_users)
     );
 
     Ok(())
@@ -102,9 +102,14 @@ fn move_file(lua: &Lua, args: LuaTable) -> LuaResult<()> {
     Ok(())
 }
 
-fn remove_file(_lua: &Lua, path: String) -> LuaResult<()> {
+fn remove_file(_lua: &Lua, input: LuaTable) -> LuaResult<()> {
+    let mut fargs: Vec<String> = input
+        .get::<_, String>("args")?
+        .split(" ")
+        .map(|x| x.to_string())
+        .collect();
+    let path = fargs.pop().unwrap();
     {
-        let path = path.clone();
         std::thread::spawn(|| {
             let rt = Runtime::new().unwrap();
             rt.block_on(async {
@@ -163,7 +168,7 @@ fn move_dir(_lua: &Lua, input: LuaTable) -> LuaResult<()> {
 }
 
 fn create_dir(_lua: &Lua, input: LuaTable) -> LuaResult<()> {
-    let relative_path: String = input.get("args")?;
+    let relative_path: String = input.get::<_,String>("args")?.trim_end().to_string();
 
     RT.block_on(async {
         let mut api = server_api.lock().await;
@@ -235,14 +240,22 @@ fn list_users(_lua: &Lua, _: ()) -> LuaResult<Vec<String>> {
     }))
 }
 
-fn disconnect_user(_lua: &Lua, user: String) -> LuaResult<()> {
+fn disconnect_user(_lua: &Lua, input: LuaTable) -> LuaResult<()> {
+    let user = input.get::<_, String>("args")?.trim_end().to_string();
     RT.block_on(async {
         let api = server_api.lock().await;
         let _ = api.close_connection(user.as_str()).await;
     });
     Ok(())
 }
-fn change_prevlidge(_lua: &Lua, (user, privileged): (String, String)) -> LuaResult<()> {
+fn change_prevlidge(_lua: &Lua, input: LuaTable) -> LuaResult<()> {
+    let farg = input
+        .get::<_, String>("args")?
+        .split(" ")
+        .map(|x| x.to_string())
+        .collect::<Vec<_>>();
+    let user = farg[0].to_string();
+    let privileged = farg[1].to_string();
     RT.block_on(async {
         let api = server_api.lock().await;
         let _ = api
