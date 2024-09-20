@@ -1,7 +1,5 @@
-use std::error::Error;
-
 use mlua::prelude::*;
-use pairwriter::prelude::{start_server, *};
+use pairwriter::prelude::start_server;
 use tokio::runtime::Runtime;
 
 lazy_static::lazy_static! {
@@ -13,12 +11,19 @@ fn pairwriter_helper(lua: &Lua) -> LuaResult<LuaTable> {
     let out = lua.create_table()?;
     out.set(
         "start_server",
-        lua.create_function(server::lua_start_server).unwrap(),
+        lua.create_function(server::lua_start_server)?,
     )?;
+
+    out.set("server_undo", lua.create_function(server::undo)?)?;
+    out.set("server_redo", lua.create_function(server::redo)?)?;
+
     out.set(
         "connect_as_client",
         lua.create_function(client::client_connect)?,
     )?;
+    out.set("client_undo", lua.create_function(client::undo)?)?;
+    out.set("client_redo", lua.create_function(client::redo)?)?;
+
     Ok(out)
 }
 
@@ -57,3 +62,4 @@ fn text_to_lines(lua: &Lua, text: impl std::io::BufRead) -> LuaResult<LuaTable> 
 
 mod client;
 mod server;
+mod macros;

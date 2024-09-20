@@ -1,111 +1,61 @@
 use super::*;
 
 pub(super) fn export_cmds(lua: &Lua) -> LuaResult<()> {
-    let vim: LuaTable = lua.globals().get("vim")?;
-    let vim_api: LuaTable = vim.get("api")?;
+    // as
 
-    // Open file command
-    let command = lua.create_function(open_file)?;
-    let opts = lua.create_table()?;
-    opts.set("complete", lua.create_function(auto_complete_file)?)?;
-    opts.set("nargs", 1)?;
-    vim_api.call_function(
-        "nvim_create_user_command",
-        ("PairwriterOpenFile", command, opts),
-    )?;
-    // End open file command
+    macro_rules! commands {
+        ($lua:ident,
+                $(
+                ($command_name:expr , $command:ident , $auto_complete:ident)
+                ,)+
+                +
+                $(
+                    ($command_name2:expr, $command2:ident)
+                ,)*
+                ) => {
+                let vim: LuaTable = $lua.globals().get("vim")?;
+                let vim_api: LuaTable = vim.get("api")?;
+                $(
+                    let command = $lua.create_function($command)?;
+                    let opts = $lua.create_table()?;
+                    opts.set("complete", $lua.create_function($auto_complete)?)?;
+                    opts.set("nargs", 1)?;
+                    vim_api.call_function(
+                        "nvim_create_user_command",
+                        ($command_name, command, opts),
+                    )?;
+                )+
+                $(
+                    let command = $lua.create_function($command2)?;
+                    let opts = $lua.create_table()?;
+                    opts.set("nargs", 0)?;
+                    vim_api.call_function(
+                        "nvim_create_user_command",
+                        ($command_name2, command, opts),
+                    )?;
 
-    let command = lua.create_function(create_file)?;
-    let opts = lua.create_table()?;
-    opts.set("nargs", 1)?;
+                )*
 
-    vim_api.call_function(
-        "nvim_create_user_command",
-        ("PairwriterCreateFile", command, opts),
-    )?;
-
-    // Save file command
-
-    let command = lua.create_function(save_file)?;
-    let opts = lua.create_table()?;
-    opts.set("nargs", 0)?;
-    vim_api.call_function(
-        "nvim_create_user_command",
-        ("PairwriterSaveFile", command, opts),
-    )?;
-
-    // End save file command
-
-    // remove file command
-    let command = lua.create_function(remove_file)?;
-    let opts = lua.create_table()?;
-    opts.set("complete", lua.create_function(auto_complete_file)?)?;
-    opts.set("nargs", 1)?;
-    vim_api.call_function(
-        "nvim_create_user_command",
-        ("PairwriterRemoveFile", command, opts),
-    )?;
-    // End remove file command
-
-    // move file command
-    let command = lua.create_function(move_file)?;
-    let opts = lua.create_table()?;
-    opts.set("complete", lua.create_function(auto_complete_file)?)?;
-    opts.set("nargs", 1)?;
-    vim_api.call_function(
-        "nvim_create_user_command",
-        ("PairwriterMoveFile", command, opts),
-    )?;
-    // End move file command
-
-    // create directory command
-
-    let command = lua.create_function(create_dir)?;
-    let opts = lua.create_table()?;
-    opts.set("complete", lua.create_function(auto_complete_dir)?)?;
-    opts.set("nargs", 1)?;
-    vim_api.call_function(
-        "nvim_create_user_command",
-        ("PairwriterCreateDir", command, opts),
-    )?;
-
-    // End create directory command
-
-    // remove directory command
-
-    let command = lua.create_function(remove_dir)?;
-    let opts = lua.create_table()?;
-
-    opts.set("complete", lua.create_function(auto_complete_dir)?)?;
-    opts.set("nargs", 1)?;
-
-    vim_api.call_function(
-        "nvim_create_user_command",
-        ("PairwriterRemoveDir", command, opts),
-    )?;
-
-    // End remove directory command
-
-    // move directory command
-
-    let command = lua.create_function(move_dir)?;
-    let opts = lua.create_table()?;
-
-    opts.set("complete", lua.create_function(auto_complete_dir)?)?;
-    opts.set("nargs", 1)?;
-
-    vim_api.call_function(
-        "nvim_create_user_command",
-        ("PairwriterMoveDir", command, opts),
-    )?;
-
-    // End move directory command
+        };
+    }
+    commands!(
+        lua,
+        ("PairwriterRemoveFile", remove_file, auto_complete_file),
+        ("PairwriterMoveFile", move_file, auto_complete_file),
+        ("PairwriterCreateDir", create_dir, auto_complete_dir),
+        ("PairwriterRemoveDir", remove_dir, auto_complete_dir),
+        ("PairwriterMoveDir", move_dir, auto_complete_dir),
+        ("PairwriterOpenFile", open_file, auto_complete_file),
+        ("PairwriterCreateFile", create_file, auto_complete_file),
+        +
+        ("PairwriterSaveFile", save_file),
+    );
 
     Ok(())
 }
 
 // funciton for moving the file
-fn move_file(lua: &Lua, args: LuaTable) -> LuaResult<()> {
+fn move_file(_lua: &Lua, args: LuaTable) -> LuaResult<()> {
     // if args.get::<_, i32>("nargs")? != 2 {
     //     return Err(LuaError::external("expected 2 arguments"));
     // }
@@ -136,15 +86,6 @@ fn move_file(lua: &Lua, args: LuaTable) -> LuaResult<()> {
             });
         });
     }
-    lua.load(format!(
-        r#"
-            vim.schedule(function()
-                vim.api.nvim_command('bd!' .. 'Pairwriter://' .. '{to}')
-            end)
-        
-        "#
-    ))
-    .exec()?;
     Ok(())
 }
 
@@ -173,7 +114,9 @@ fn create_file(_lua: &Lua, path: String) -> LuaResult<()> {
     std::thread::spawn(|| {
         let rt = Runtime::new().unwrap();
         rt.block_on(async {
-            server_api
+            client_api
+                .get()
+                .unwrap()
                 .lock()
                 .await
                 .send_rpc(RPC::CreateFile { path })
@@ -198,7 +141,9 @@ fn remove_file(lua: &Lua, path: String) -> LuaResult<()> {
         std::thread::spawn(|| {
             let rt = Runtime::new().unwrap();
             rt.block_on(async {
-                server_api
+                client_api
+                    .get()
+                    .unwrap()
                     .lock()
                     .await
                     .send_rpc(RPC::DeleteFile { path })
@@ -212,20 +157,31 @@ fn remove_file(lua: &Lua, path: String) -> LuaResult<()> {
 
 fn open_file(lua: &Lua, input: LuaTable) -> LuaResult<()> {
     let relative_path: String = input.get("args")?;
-    RT.block_on(async {
-        let mut api = client_api.get().unwrap().lock().await;
-        let _ = api.read_file(relative_path.clone()).await; // this will request the buffer
-    });
+    let res = RT
+        .block_on(async {
+            let mut api = client_api.get().unwrap().lock().await;
+            api.read_file(relative_path.clone()).await // this will request the buffer and if
+                                                       // the buffer is preset will do nothing
+        })
+        .is_err();
+
     lua.load(format!(
         r#"
             vim.schedule(function()
+                local buffer_name = "pairwriter://" .. "{relative_path}"
+
+                if vim.fn.bufexists(buffer_name) == 1 then 
+                    vim.api.nvim_command('buffer ' .. vim.fn.bufnr(buffer_name))
+                    return 
+                end
+                if {res} then -- if the buffer is not here wait for 300ms
+                    vim.uv.sleep(300) 
+                end
                 local buf = vim.api.nvim_create_buf(true, true)
                 vim.api.nvim_set_option_value('buftype', 'nofile', {{ buf = buf }})
                 vim.api.nvim_set_option_value('bufhidden', 'hide', {{ buf = buf }})
                 vim.api.nvim_set_current_buf(buf)
-                local buffer_name = "pairwriter://" .. "{relative_path}"
                 vim.api.nvim_buf_set_name(buf, buffer_name)
-
                 vim.api.nvim_command('e!')
             end)
         "#,

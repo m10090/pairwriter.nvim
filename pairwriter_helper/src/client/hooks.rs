@@ -1,7 +1,5 @@
 use super::*;
 
-use std::{io::BufRead, panic};
-
 pub(super) fn start_hooks(lua: &Lua) -> LuaResult<()> {
     let vim = lua.globals().get::<_, LuaTable>("vim")?;
     let vim_api = vim.get::<_, LuaTable>("api")?;
@@ -14,6 +12,7 @@ pub(super) fn start_hooks(lua: &Lua) -> LuaResult<()> {
 
     open_file_hook(lua, &common_table)?;
     file_edit_hook(lua, &common_table)?;
+    undo_redo_hook(lua, &common_table)?;
 
     lua.globals().set(
         "__outside_edit_hook",
@@ -22,13 +21,60 @@ pub(super) fn start_hooks(lua: &Lua) -> LuaResult<()> {
 
     lua.load(
         r#"
+        local polling_rate = vim.g.pairwriter_pulling_rate or 100
         local timer = vim.uv.new_timer()
-        timer:start(0, 300, function()
+        timer:start(0, polling_rate, function()
             coroutine.resume(__outside_edit_hook)
         end)
         "#,
     )
     .exec()?;
+
+    Ok(())
+}
+
+fn undo_redo_hook(lua: &Lua, common_table: &LuaTable) -> LuaResult<()> {
+
+    let undo_redo_table = lua.create_table()?;
+    shallow_copy(common_table, &undo_redo_table)?;
+
+    undo_redo_table.set(
+        "callback",
+        lua.create_function(move |lua, env: LuaTable| {
+            let vim: LuaTable = lua.globals().get("vim")?;
+            let vim_api: LuaTable = vim.get("api")?;
+            let bufnr: i32 = env.get("buf")?;
+            let path: String = bufname_to_relativepath(env.get::<_, String>("file")?);
+
+            let noremap = lua.create_table()?;
+            noremap.set("noremap", true)?;
+            vim_api.call_function(
+                "nvim_buf_set_keymap",
+                (
+                    bufnr,
+                    "n",
+                    "u",
+                    format!("<CMD>lua require('pairwriter').client_undo('{path}')<CR>"),
+                    noremap.clone(),
+                ),
+            )?;
+            vim_api.call_function(
+                "nvim_buf_set_keymap",
+                (
+                    bufnr,
+                    "n",
+                    "<C-r>",
+                    format!("<CMD>lua require('pairwriter').client_redo('{path}')<CR>"),
+                    noremap,
+                ),
+            )?;
+            Ok(())
+        })?,
+    )?;
+    let vim: LuaTable = lua.globals().get("vim")?;
+    let vim_api: LuaTable = vim.get("api")?;
+
+    vim_api.call_function("nvim_create_autocmd", ("BufEnter", undo_redo_table))?;
 
     Ok(())
 }
@@ -132,35 +178,38 @@ async fn outside_edit_hook(lua: &Lua, _: ()) -> LuaResult<()> {
         .unwrap();
 
     while let Some(x) = receiver.recv().await {
-        if let RPC::EditBuffer { path, .. } = x {
-            let bufname = relativepath_to_bufname(path.clone());
+        match x {
+            RPC::EditBuffer { path, .. } | RPC::Undo { path } | RPC::Redo { path } => {
+                let bufname = relativepath_to_bufname(path.clone());
 
-            let to_be_called = lua.create_function(move |lua, _: ()| {
+                let to_be_called = lua.create_function(move |lua, _: ()| {
+                    let vim: LuaTable = lua.globals().get("vim")?;
+                    let vim_fn: LuaTable = vim.get("fn")?;
+                    let vim_api: LuaTable = vim.get("api")?;
+                    let _: () = lua.globals().call_function("print", bufname.clone())?;
+
+                    let bufnr: i32 = vim_fn.call_function("bufnr", (bufname.clone(),))?;
+                    if bufnr != -1 {
+                        // in the case of the file is  opened
+                        let path = path.clone();
+                        let file = RT.block_on(async move {
+                            let text = client_api
+                                .get()
+                                .unwrap()
+                                .lock()
+                                .await
+                                .read_file(path)
+                                .await?;
+                            text_to_lines(lua, text.as_slice())
+                        })?;
+                        vim_api.call_function("nvim_buf_set_lines", (bufnr, 0, -1, false, file))?;
+                    }
+                    Ok(())
+                })?;
                 let vim: LuaTable = lua.globals().get("vim")?;
-                let vim_fn: LuaTable = vim.get("fn")?;
-                let vim_api: LuaTable = vim.get("api")?;
-                let _: () = lua.globals().call_function("print", bufname.clone())?;
-
-                let bufnr: i32 = vim_fn.call_function("bufnr", (bufname.clone(),))?;
-                if bufnr != -1 {
-                    // in the case of the file is  opened
-                    let path = path.clone();
-                    let file = RT.block_on(async move {
-                        let text = client_api
-                            .get()
-                            .unwrap()
-                            .lock()
-                            .await
-                            .read_file(path)
-                            .await?;
-                        text_to_lines(lua, text.as_slice())
-                    })?;
-                    vim_api.call_function("nvim_buf_set_lines", (bufnr, 0, -1, false, file))?;
-                }
-                Ok(())
-            })?;
-            let vim: LuaTable = lua.globals().get("vim")?;
-            vim.call_function("schedule", to_be_called)?;
+                vim.call_function("schedule", to_be_called)?;
+            }
+            _ => {}
         }
     }
     Ok(())

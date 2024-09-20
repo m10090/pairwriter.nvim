@@ -18,14 +18,24 @@ if vim.fn.has("win32") == 1 then
   -- command for windows 
   cmd = string.format(
     "cd %s && cargo b -r && copy target\\release\\pairwriter.exe %s",
-    "pairwriter-lua",
+    "pairwriter_lua",
     path
   )
 end
+
 if vim.fn.empty(vim.fn.glob(pairwriter_dir))  then
   -- run cmd to compile the rust program
   vim.fn.system(cmd)
 end
 
+-- set shellslash for windows 
+if vim.fn.has("win32") == 1 then
+  vim.o.shellslash = true
+else
+
 package.cpath = pairwriter_dir.."/?.so" .. ";".. package.cpath
+end
+
+
+
 return require("pairwriter_helper")

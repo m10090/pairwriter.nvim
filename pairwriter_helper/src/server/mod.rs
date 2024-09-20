@@ -1,4 +1,6 @@
-use std::{borrow::Cow, fmt::Formatter, fs, sync::OnceLock, thread::sleep, time::Duration};
+use std::sync::OnceLock;
+
+use pairwriter::{prelude::RPC, server_import::*};
 
 use super::*;
 
@@ -30,6 +32,7 @@ pub fn lua_start_server(lua: &Lua, port: u16) -> LuaResult<LuaTable> {
         let out_funcs = lua.create_table()?;
         // here we should hooks to the nvim
         hooks::start_hooks(lua)?;
+        exported_functions::export_cmds(lua)?;
 
         Ok(out_funcs)
     } else {
@@ -38,7 +41,44 @@ pub fn lua_start_server(lua: &Lua, port: u16) -> LuaResult<LuaTable> {
         ))
     }
 }
-
+pub fn undo(lua: &Lua, path: String) -> LuaResult<()> {
+    RT.block_on(async {
+        server_api
+            .lock()
+            .await
+            .send_rpc(RPC::Undo { path: path.clone() })
+            .await;
+    });
+    lua.load(format!(
+        r#"
+        vim.schedule(function()
+            vim.api.nvim_command('e! ' .. '{path}')
+        end)
+        
+        "#
+    ))
+    .exec()?;
+    Ok(())
+}
+pub fn redo(lua: &Lua, path: String) -> LuaResult<()> {
+    RT.block_on(async {
+        server_api
+            .lock()
+            .await
+            .send_rpc(RPC::Redo { path: path.clone() })
+            .await;
+    });
+    lua.load(format!(
+        r#"
+        vim.schedule(function()
+            vim.api.nvim_command('e! ' .. '{path}')
+        end)
+        
+        "#
+    ))
+    .exec()?;
+    Ok(())
+}
 mod hooks;
 
 mod exported_functions;
