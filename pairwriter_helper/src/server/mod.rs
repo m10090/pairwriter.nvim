@@ -10,6 +10,7 @@ lazy_static::lazy_static! {
             .into_os_string()
             .into_string()
             .unwrap()
+            .replace("\\", "/")
             + "/"; // this would work if you open it in the root directory (who does that?)
 
 }
@@ -18,10 +19,6 @@ pub fn lua_start_server(lua: &Lua, port: u16) -> LuaResult<LuaTable> {
     if ONCE.get().is_none() {
         let _ = ONCE.set(());
 
-        #[cfg(target_os = "windows")]
-        {
-            working_dir = working_dir.replace("\\", "/");
-        }
 
         std::thread::spawn(move || {
             // this is the only why that works for now

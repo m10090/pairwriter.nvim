@@ -1,5 +1,4 @@
 use mlua::prelude::*;
-use pairwriter::prelude::start_server;
 use tokio::runtime::Runtime;
 
 lazy_static::lazy_static! {
@@ -62,4 +61,3 @@ fn text_to_lines(lua: &Lua, text: impl std::io::BufRead) -> LuaResult<LuaTable> 
 
 mod client;
 mod server;
-mod macros;
