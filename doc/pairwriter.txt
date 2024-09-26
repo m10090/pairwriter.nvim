@@ -1,0 +1,61 @@
+*Pairwriter*
+
+
+==============================================================================
+INTRODUCTION                                         *Pairwriter-introduction*
+a online pair programming tool
+
+Pairwriter is a online pair programming tool that allows two people to work
+
+==============================================================================
+REQUIREMENTS                                         *Pairwriter-requirements*
+
+- Neovim >= v0.9.0
+
+- Rust >= 1.40.0
+
+- lua >= 5.1
+
+==============================================================================
+INSTALLATION                                         *pairwriter-installation*
+
+1. Install the plugin using your favorite plugin manager.
+
+2. Run require('pairwriter').setup({})
+
+3. compiler rust is required for the plugin to work (do you to linking issues
+you need to compile it and add the binary to your the path specified to your 
+os)
+
+==============================================================================
+USAGE                                                       *Pairwriter-usage*
+
+1. Run lua require("pairwriter").start_server({port}) to start the server
+
+2. Run lua require("pairwriter").connect_as_client({ip}, {port}) 
+to connect to the server
+
+
+==============================================================================
+COMMANDS                                                 *Pairwriter-commands*
+
+**PairwriterRemoveFile** - file path to remove *should start with ./*
+
+**PairwriterAddFile** - file path to add *should start with ./*
+
+**PairwriterMoveFile** - file path to move *should start with ./*
+
+**PairwriterRemoveFile** - file path to edit *should start with ./*
+
+**PairwriterAddDir** - dir path to add *should start with ./ and end with /*
+
+**PairwriterMoveDir** - dir path to move *should start with ./ and end with /*
+
+**PairwriterRemoveDir**  - dir path to remove *should start with ./ and end with /*
+
+**PairwriterAddDir** - dir path to add *should start with ./ and end with /*
+
+**PairwriterChangePreviledge** - change the previledge of the user server only
+
+**PairwriterOpenFile** - open file path *should start with ./*
+
