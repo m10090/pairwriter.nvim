@@ -783,7 +783,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 [[package]]
 name = "pairwriter"
 version = "0.1.0"
-source = "git+https://github.com/m10090/PairWriter#2e0ee24183509e415a356cd46d1068171a6b2a60"
+source = "git+https://github.com/m10090/PairWriter?rev=2e0ee24183509e415a356cd46d1068171a6b2a60#2e0ee24183509e415a356cd46d1068171a6b2a60"
 dependencies = [
  "automerge",
  "bincode",

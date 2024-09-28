@@ -1,4 +1,4 @@
-*Pairwriter*
+*pairwriter.nvim*
 
 
 ==============================================================================
@@ -58,4 +58,23 @@ COMMANDS                                                 *Pairwriter-commands*
 **PairwriterChangePreviledge** - change the previledge of the user server only
 
 **PairwriterOpenFile** - open file path *should start with ./*
+
+==============================================================================
+SETTINGS                                                 *Pairwriter-settings*
+
+you can set it with the setup function
+
+note: you need to run the require('pairwriter').setup() before running 
+Pairwriter (server/client)
+
+default config  > {
+  username = "SERVER", -- username of the server
+  -- for unix
+  dir_path = "~/.local/share/nvim/pairwriter/", -- path to store the files
+  -- for windows
+  dir_path = "~\\AppData\\.local\\share\\nvim-data\\pairwriter",
+}
+
+vim.g.pairwriter_pulling_rate = 100 -- rate at off reading the message in ms
+
 
