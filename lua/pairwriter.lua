@@ -33,7 +33,6 @@ M.setup = function(t)
 
 	vim.cmd("let $SERVER_USERNAME='" .. t.username .. "'")
 
-	M = {}
 
 	copy_function_pointers(require("pairwriter_helper"), M)
 	package.cpath = old_pacakge_cpath -- reset the package path
